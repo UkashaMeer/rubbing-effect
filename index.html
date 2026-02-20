@@ -2,15 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Scratch & Reveal</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
   body {
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -18,49 +27,41 @@
     background: #0d0d0d;
     font-family: 'DM Sans', sans-serif;
     color: #fff;
-    overflow: hidden;
-    user-select: none;
-  }
-
-  /* Grain overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 100;
+    padding: 16px;
   }
 
   h1 {
     font-family: 'Bebas Neue', cursive;
-    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-size: clamp(1.6rem, 7vw, 3rem);
     letter-spacing: 0.12em;
     color: #ff2b2b;
-    margin-bottom: 6px;
-    text-shadow: 0 0 30px rgba(255,43,43,0.4);
+    margin-bottom: 4px;
+    text-shadow: 0 0 24px rgba(255,43,43,0.5);
+    line-height: 1;
   }
 
   .subtitle {
-    font-size: 0.8rem;
-    letter-spacing: 0.25em;
+    font-size: clamp(0.6rem, 2.5vw, 0.75rem);
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: #555;
-    margin-bottom: 32px;
+    color: #444;
+    margin-bottom: clamp(12px, 3vw, 20px);
   }
 
   .canvas-wrapper {
     position: relative;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 0 0 1px #222, 0 30px 80px rgba(0,0,0,0.8), 0 0 60px rgba(255,43,43,0.08);
+    box-shadow: 0 0 0 1px #222, 0 20px 60px rgba(0,0,0,0.9), 0 0 40px rgba(255,43,43,0.1);
+    flex-shrink: 0;
   }
 
   #reveal-image {
     display: block;
-    width: min(480px, 90vw);
-    height: min(320px, 60vw);
+    width: 100%;
+    height: 100%;
     object-fit: cover;
+    pointer-events: none;
   }
 
   #scratch-canvas {
@@ -73,80 +74,82 @@
   }
 
   .progress-bar-wrap {
-    margin-top: 20px;
-    width: min(480px, 90vw);
+    margin-top: 14px;
     height: 3px;
-    background: #1a1a1a;
+    background: #1c1c1c;
     border-radius: 99px;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   .progress-bar {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #ff2b2b, #ff7a00);
+    background: linear-gradient(90deg, #ff2b2b, #ff8800);
     border-radius: 99px;
-    transition: width 0.1s linear;
+    transition: width 0.08s linear;
   }
 
   .hint {
-    margin-top: 14px;
-    font-size: 0.72rem;
-    letter-spacing: 0.2em;
+    margin-top: 10px;
+    font-size: clamp(0.58rem, 2vw, 0.7rem);
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: #333;
-    transition: opacity 0.4s;
+    transition: opacity 0.5s;
+    text-align: center;
   }
 
   .reset-btn {
-    margin-top: 28px;
+    margin-top: clamp(12px, 3vw, 20px);
     background: none;
     border: 1px solid #2a2a2a;
     color: #555;
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.75rem;
-    letter-spacing: 0.2em;
+    font-size: clamp(0.65rem, 2.5vw, 0.75rem);
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     padding: 10px 28px;
     border-radius: 99px;
     cursor: pointer;
     transition: all 0.25s;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
   }
 
+  .reset-btn:active,
   .reset-btn:hover {
     border-color: #ff2b2b;
     color: #ff2b2b;
-    box-shadow: 0 0 20px rgba(255,43,43,0.15);
+    box-shadow: 0 0 18px rgba(255,43,43,0.15);
   }
 
-  .complete-badge {
+  /* Small pill badge - shown only after reveal, bottom-left corner */
+  .revealed-overlay {
     position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,0,0,0.0);
+    bottom: 12px;
+    left: 12px;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 0.5s;
+    transform: translateY(6px);
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
   }
 
-  .complete-badge span {
+  .revealed-overlay .tag {
     font-family: 'Bebas Neue', cursive;
-    font-size: 3rem;
-    letter-spacing: 0.15em;
+    font-size: clamp(0.75rem, 3vw, 1rem);
+    letter-spacing: 0.2em;
     color: #fff;
-    text-shadow: 0 0 30px rgba(255,43,43,0.9), 0 2px 4px rgba(0,0,0,0.5);
-    transform: scale(0.8);
-    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    background: rgba(200,20,20,0.88);
+    padding: 4px 12px 3px;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+    white-space: nowrap;
   }
 
-  .complete-badge.show {
+  .revealed-overlay.show {
     opacity: 1;
-  }
-
-  .complete-badge.show span {
-    transform: scale(1);
+    transform: translateY(0);
   }
 </style>
 </head>
@@ -155,8 +158,7 @@
 <h1>Scratch & Reveal</h1>
 <p class="subtitle">Rub to uncover what's beneath</p>
 
-<div class="canvas-wrapper">
-  <!-- The image to reveal - using a beautiful landscape from picsum -->
+<div class="canvas-wrapper" id="wrapper">
   <img id="reveal-image"
     src="https://picsum.photos/seed/redreveal/960/640"
     alt="Hidden image"
@@ -164,127 +166,217 @@
     draggable="false"
   />
   <canvas id="scratch-canvas"></canvas>
-  <div class="complete-badge" id="badge"><span>REVEALED ✦</span></div>
+  <div class="revealed-overlay" id="badge">
+    <span class="tag">✦ REVEALED</span>
+  </div>
 </div>
 
-<div class="progress-bar-wrap">
+<div class="progress-bar-wrap" id="prog-wrap">
   <div class="progress-bar" id="progress-bar"></div>
 </div>
-<p class="hint" id="hint">Drag your finger or mouse across the red surface</p>
-
+<p class="hint" id="hint">Rub your finger across the red surface</p>
 <button class="reset-btn" id="reset-btn">↺ Reset</button>
 
 <script>
-  const canvas = document.getElementById('scratch-canvas');
-  const ctx = canvas.getContext('2d');
-  const img = document.getElementById('reveal-image');
+  const canvas      = document.getElementById('scratch-canvas');
+  const ctx         = canvas.getContext('2d', { willReadFrequently: true });
+  const img         = document.getElementById('reveal-image');
+  const wrapper     = document.getElementById('wrapper');
+  const progWrap    = document.getElementById('prog-wrap');
   const progressBar = document.getElementById('progress-bar');
-  const hint = document.getElementById('hint');
-  const badge = document.getElementById('badge');
-  const resetBtn = document.getElementById('reset-btn');
+  const hint        = document.getElementById('hint');
+  const badge       = document.getElementById('badge');
+  const resetBtn    = document.getElementById('reset-btn');
 
   let isDrawing = false;
-  let revealed = false;
+  let revealed  = false;
+  let lastX = null, lastY = null;
+  let lastCheck = 0;
 
+  /* ── Compute canvas size to fit viewport ── */
+  function calcSize() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const pad = 32;
+    const titleBlock = document.querySelector('h1').offsetHeight
+                     + document.querySelector('.subtitle').offsetHeight
+                     + parseInt(getComputedStyle(document.querySelector('.subtitle')).marginBottom);
+    const bottomBlock = 3 + 10 + 40 + 20 + 10; // progress + hint + btn + margins
+    const availW = Math.min(vw - pad, 520);
+    const availH = vh - pad - titleBlock - bottomBlock - 40;
+    const aspect = 960 / 640;
+    let w = availW;
+    let h = w / aspect;
+    if (h > availH) { h = availH; w = h * aspect; }
+    return { w: Math.floor(w), h: Math.floor(h) };
+  }
+
+  /* ── Draw the red scratch layer ── */
   function initCanvas() {
-    const rect = img.getBoundingClientRect();
-    canvas.width = img.naturalWidth || rect.width;
-    canvas.height = img.naturalHeight || rect.height;
+    const { w, h } = calcSize();
 
-    // Fill with vivid red
-    ctx.fillStyle = '#cc1f1f';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    wrapper.style.width  = w + 'px';
+    wrapper.style.height = h + 'px';
+    progWrap.style.width = w + 'px';
 
-    // Add subtle texture lines for depth
+    canvas.width  = w;
+    canvas.height = h;
+
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Red gradient fill
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0,   '#d81c1c');
+    grad.addColorStop(0.5, '#b51010');
+    grad.addColorStop(1,   '#cc2020');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle scan-lines
     ctx.strokeStyle = 'rgba(0,0,0,0.07)';
     ctx.lineWidth = 1;
-    for (let i = 0; i < canvas.height; i += 6) {
+    for (let y = 0; y < h; y += 5) {
       ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
       ctx.stroke();
     }
 
-    // Subtle vignette
-    const radGrad = ctx.createRadialGradient(
-      canvas.width / 2, canvas.height / 2, canvas.height * 0.2,
-      canvas.width / 2, canvas.height / 2, canvas.height * 0.8
-    );
-    radGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    radGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
-    ctx.fillStyle = radGrad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Ghost hint text
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.font = `bold ${Math.floor(w * 0.10)}px 'Bebas Neue', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SCRATCH HERE', w / 2, h / 2);
 
     revealed = false;
+    lastX = null; lastY = null;
     badge.classList.remove('show');
     progressBar.style.width = '0%';
-    hint.style.opacity = 1;
+    hint.style.opacity = '1';
   }
 
+  /* ── Get position relative to canvas ── */
   function getPos(e) {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const touch = e.touches ? e.touches[0] : e;
+    const src  = e.touches ? e.touches[0] : e;
     return {
-      x: (touch.clientX - rect.left) * scaleX,
-      y: (touch.clientY - rect.top) * scaleY
+      x: src.clientX - rect.left,
+      y: src.clientY - rect.top
     };
   }
 
-  function scratch(x, y) {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.arc(x, y, 55, 0, Math.PI * 2);
-    ctx.fill();
+  /* ── Dynamic brush radius ── */
+  function brushR() {
+    return Math.max(28, canvas.width * 0.08);
   }
 
+  /* ── Smooth stroke: line segment + circle cap ── */
+  function scratchAt(x, y) {
+    ctx.globalCompositeOperation = 'destination-out';
+    const r = brushR();
+    ctx.lineJoin = 'round';
+    ctx.lineCap  = 'round';
+    ctx.lineWidth = r * 2;
+
+    ctx.beginPath();
+    if (lastX !== null) {
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+    } else {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Extra circle fill for solid edges
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    lastX = x;
+    lastY = y;
+  }
+
+  /* ── Progress check (throttled) ── */
   function checkProgress() {
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const now = Date.now();
+    if (now - lastCheck < 150) return;
+    lastCheck = now;
+
+    // Sample every 4th pixel for performance
+    const data  = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let transparent = 0;
-    const total = data.length / 4;
-    for (let i = 3; i < data.length; i += 4) {
+    const stride = 16; // check every 4th pixel (4 channels × 4)
+    const total  = Math.floor(data.length / stride);
+    for (let i = 3; i < data.length; i += stride) {
       if (data[i] < 128) transparent++;
     }
-    const pct = (transparent / total) * 100;
-    progressBar.style.width = pct + '%';
 
-    if (pct > 35 && !revealed) {
+    const pct = (transparent / total) * 100;
+    progressBar.style.width = Math.min(pct, 100) + '%';
+
+    if (pct > 40 && !revealed) {
       revealed = true;
-      // Clear everything
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      progressBar.style.width = '100%';
-      hint.style.opacity = 0;
-      badge.classList.add('show');
+      requestAnimationFrame(() => {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        progressBar.style.width = '100%';
+        hint.style.opacity = '0';
+        badge.classList.add('show');
+      });
     }
   }
 
-  // Events
-  canvas.addEventListener('mousedown', e => { isDrawing = true; const p = getPos(e); scratch(p.x, p.y); });
-  canvas.addEventListener('mousemove', e => {
-    if (!isDrawing) return;
-    const p = getPos(e);
-    scratch(p.x, p.y);
-    checkProgress();
-  });
-  canvas.addEventListener('mouseup', () => isDrawing = false);
-  canvas.addEventListener('mouseleave', () => isDrawing = false);
-
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); isDrawing = true; const p = getPos(e); scratch(p.x, p.y); }, { passive: false });
-  canvas.addEventListener('touchmove', e => {
+  /* ── Event handlers ── */
+  function onStart(e) {
     e.preventDefault();
-    if (!isDrawing) return;
+    if (revealed) return;
+    isDrawing = true;
+    lastX = null; lastY = null;
     const p = getPos(e);
-    scratch(p.x, p.y);
+    scratchAt(p.x, p.y);
+  }
+
+  function onMove(e) {
+    e.preventDefault();
+    if (!isDrawing || revealed) return;
+    const p = getPos(e);
+    scratchAt(p.x, p.y);
     checkProgress();
-  }, { passive: false });
-  canvas.addEventListener('touchend', () => isDrawing = false);
+  }
+
+  function onEnd() {
+    isDrawing = false;
+    lastX = null; lastY = null;
+  }
+
+  canvas.addEventListener('mousedown',   onStart, { passive: false });
+  canvas.addEventListener('mousemove',   onMove,  { passive: false });
+  canvas.addEventListener('mouseup',     onEnd);
+  canvas.addEventListener('mouseleave',  onEnd);
+
+  canvas.addEventListener('touchstart',  onStart, { passive: false });
+  canvas.addEventListener('touchmove',   onMove,  { passive: false });
+  canvas.addEventListener('touchend',    onEnd,   { passive: false });
+  canvas.addEventListener('touchcancel', onEnd,   { passive: false });
 
   resetBtn.addEventListener('click', initCanvas);
 
-  img.addEventListener('load', initCanvas);
-  if (img.complete) initCanvas();
+  window.addEventListener('resize', initCanvas);
+
+  /* ── Boot ── */
+  function boot() {
+    // Wait for fonts to be ready so text renders right
+    document.fonts.ready.then(initCanvas).catch(initCanvas);
+  }
+
+  if (img.complete && img.naturalWidth > 0) {
+    boot();
+  } else {
+    img.addEventListener('load', boot);
+    img.addEventListener('error', boot);
+  }
 </script>
 </body>
 </html>
