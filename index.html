@@ -28,6 +28,7 @@
     font-family: 'DM Sans', sans-serif;
     color: #fff;
     padding: 16px;
+    gap: 0;
   }
 
   h1 {
@@ -45,25 +46,28 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: #444;
-    margin-bottom: clamp(12px, 3vw, 20px);
+    margin-bottom: clamp(10px, 2.5vw, 18px);
   }
 
   .canvas-wrapper {
     position: relative;
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 0 0 1px #222, 0 20px 60px rgba(0,0,0,0.9), 0 0 40px rgba(255,43,43,0.1);
+    box-shadow: 0 0 0 1px #222, 0 20px 60px rgba(0,0,0,0.9);
     flex-shrink: 0;
   }
 
+  /* The actual image sits behind */
   #reveal-image {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
     pointer-events: none;
+    -webkit-user-drag: none;
   }
 
+  /* Canvas sits on top — fully opaque red, destination-out punches clean holes */
   #scratch-canvas {
     position: absolute;
     top: 0; left: 0;
@@ -71,10 +75,11 @@
     height: 100%;
     cursor: crosshair;
     touch-action: none;
+    /* IMPORTANT: no opacity, no filter — must be fully opaque so destination-out shows clean image */
   }
 
   .progress-bar-wrap {
-    margin-top: 14px;
+    margin-top: 12px;
     height: 3px;
     background: #1c1c1c;
     border-radius: 99px;
@@ -92,16 +97,16 @@
 
   .hint {
     margin-top: 10px;
-    font-size: clamp(0.58rem, 2vw, 0.7rem);
+    font-size: clamp(0.58rem, 2vw, 0.68rem);
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #333;
-    transition: opacity 0.5s;
+    color: #2e2e2e;
     text-align: center;
+    flex-shrink: 0;
   }
 
   .reset-btn {
-    margin-top: clamp(12px, 3vw, 20px);
+    margin-top: clamp(10px, 2.5vw, 18px);
     background: none;
     border: 1px solid #2a2a2a;
     color: #555;
@@ -109,10 +114,10 @@
     font-size: clamp(0.65rem, 2.5vw, 0.75rem);
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    padding: 10px 28px;
+    padding: 10px 30px;
     border-radius: 99px;
     cursor: pointer;
-    transition: all 0.25s;
+    transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
     flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
   }
@@ -122,34 +127,6 @@
     border-color: #ff2b2b;
     color: #ff2b2b;
     box-shadow: 0 0 18px rgba(255,43,43,0.15);
-  }
-
-  /* Small pill badge - shown only after reveal, bottom-left corner */
-  .revealed-overlay {
-    position: absolute;
-    bottom: 12px;
-    left: 12px;
-    pointer-events: none;
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
-  }
-
-  .revealed-overlay .tag {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(0.75rem, 3vw, 1rem);
-    letter-spacing: 0.2em;
-    color: #fff;
-    background: rgba(200,20,20,0.88);
-    padding: 4px 12px 3px;
-    border-radius: 4px;
-    backdrop-filter: blur(4px);
-    white-space: nowrap;
-  }
-
-  .revealed-overlay.show {
-    opacity: 1;
-    transform: translateY(0);
   }
 </style>
 </head>
@@ -166,15 +143,12 @@
     draggable="false"
   />
   <canvas id="scratch-canvas"></canvas>
-  <div class="revealed-overlay" id="badge">
-    <span class="tag">✦ REVEALED</span>
-  </div>
 </div>
 
 <div class="progress-bar-wrap" id="prog-wrap">
   <div class="progress-bar" id="progress-bar"></div>
 </div>
-<p class="hint" id="hint">Rub your finger across the red surface</p>
+<p class="hint">Rub your finger to scratch away the red</p>
 <button class="reset-btn" id="reset-btn">↺ Reset</button>
 
 <script>
@@ -184,34 +158,42 @@
   const wrapper     = document.getElementById('wrapper');
   const progWrap    = document.getElementById('prog-wrap');
   const progressBar = document.getElementById('progress-bar');
-  const hint        = document.getElementById('hint');
-  const badge       = document.getElementById('badge');
   const resetBtn    = document.getElementById('reset-btn');
 
   let isDrawing = false;
-  let revealed  = false;
   let lastX = null, lastY = null;
-  let lastCheck = 0;
+  let lastCheckTime = 0;
 
-  /* ── Compute canvas size to fit viewport ── */
+  /* ── Size the canvas to fit screen ── */
   function calcSize() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const pad = 32;
-    const titleBlock = document.querySelector('h1').offsetHeight
-                     + document.querySelector('.subtitle').offsetHeight
-                     + parseInt(getComputedStyle(document.querySelector('.subtitle')).marginBottom);
-    const bottomBlock = 3 + 10 + 40 + 20 + 10; // progress + hint + btn + margins
-    const availW = Math.min(vw - pad, 520);
-    const availH = vh - pad - titleBlock - bottomBlock - 40;
+    const titleEl    = document.querySelector('h1');
+    const subtitleEl = document.querySelector('.subtitle');
+    const hintEl     = document.querySelector('.hint');
+    const btnEl      = resetBtn;
+
+    // Measure fixed UI elements
+    const titleH    = titleEl.offsetHeight + 4;
+    const subH      = subtitleEl.offsetHeight + parseFloat(getComputedStyle(subtitleEl).marginBottom);
+    const progressH = 12 + 3;
+    const hintH     = 10 + hintEl.offsetHeight;
+    const btnH      = parseFloat(getComputedStyle(btnEl).marginTop) + btnEl.offsetHeight;
+    const padV      = 32;
+
+    const usedH = padV + titleH + subH + progressH + hintH + btnH + 20;
+    const availH = vh - usedH;
+    const availW = Math.min(vw - 32, 520);
+
     const aspect = 960 / 640;
     let w = availW;
     let h = w / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
+
     return { w: Math.floor(w), h: Math.floor(h) };
   }
 
-  /* ── Draw the red scratch layer ── */
+  /* ── Paint a solid red layer on the canvas ── */
   function initCanvas() {
     const { w, h } = calcSize();
 
@@ -219,21 +201,20 @@
     wrapper.style.height = h + 'px';
     progWrap.style.width = w + 'px';
 
+    // Set the actual pixel dimensions — this also clears the canvas
     canvas.width  = w;
     canvas.height = h;
 
+    // Reset composite mode before drawing
     ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
 
-    // Red gradient fill
-    const grad = ctx.createLinearGradient(0, 0, w, h);
-    grad.addColorStop(0,   '#d81c1c');
-    grad.addColorStop(0.5, '#b51010');
-    grad.addColorStop(1,   '#cc2020');
-    ctx.fillStyle = grad;
+    // Solid red fill — NO transparency, NO gradient tricks that cause opacity
+    ctx.fillStyle = '#cc1a1a';
     ctx.fillRect(0, 0, w, h);
 
-    // Subtle scan-lines
-    ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+    // Light scanline texture for depth
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
     ctx.lineWidth = 1;
     for (let y = 0; y < h; y += 5) {
       ctx.beginPath();
@@ -242,132 +223,128 @@
       ctx.stroke();
     }
 
-    // Ghost hint text
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.font = `bold ${Math.floor(w * 0.10)}px 'Bebas Neue', sans-serif`;
+    // Subtle ghost text hint
+    ctx.fillStyle = 'rgba(255,255,255,0.055)';
+    ctx.font = `bold ${Math.floor(w * 0.09)}px Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('SCRATCH HERE', w / 2, h / 2);
 
-    revealed = false;
-    lastX = null; lastY = null;
-    badge.classList.remove('show');
+    // Reset state
+    lastX = null;
+    lastY = null;
     progressBar.style.width = '0%';
-    hint.style.opacity = '1';
   }
 
-  /* ── Get position relative to canvas ── */
+  /* ── Get touch/mouse position relative to canvas pixels ── */
   function getPos(e) {
     const rect = canvas.getBoundingClientRect();
-    const src  = e.touches ? e.touches[0] : e;
+    // Scale from CSS size to actual pixel size
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
     return {
-      x: src.clientX - rect.left,
-      y: src.clientY - rect.top
+      x: (src.clientX - rect.left) * scaleX,
+      y: (src.clientY - rect.top)  * scaleY
     };
   }
 
-  /* ── Dynamic brush radius ── */
+  /* ── Brush size scales with canvas ── */
   function brushR() {
-    return Math.max(28, canvas.width * 0.08);
+    return Math.max(30, canvas.width * 0.075);
   }
 
-  /* ── Smooth stroke: line segment + circle cap ── */
+  /* ── Scratch: punch a clean hole using destination-out ── */
   function scratchAt(x, y) {
+    // destination-out erases pixels on the canvas, showing the image below
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.globalAlpha = 1; // MUST be 1 — any alpha < 1 causes semi-transparent edges (the "opacity" bug)
+
     const r = brushR();
-    ctx.lineJoin = 'round';
-    ctx.lineCap  = 'round';
+    ctx.lineJoin  = 'round';
+    ctx.lineCap   = 'round';
     ctx.lineWidth = r * 2;
 
     ctx.beginPath();
     if (lastX !== null) {
+      // Draw a thick line from last point to current — fills gaps during fast movement
       ctx.moveTo(lastX, lastY);
       ctx.lineTo(x, y);
     } else {
       ctx.moveTo(x, y);
-      ctx.lineTo(x, y);
+      ctx.lineTo(x + 0.1, y); // tiny nudge so stroke renders on a single tap
     }
     ctx.stroke();
-
-    // Extra circle fill for solid edges
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
 
     lastX = x;
     lastY = y;
   }
 
-  /* ── Progress check (throttled) ── */
-  function checkProgress() {
+  /* ── Progress tracking (throttled for performance) ── */
+  function updateProgress() {
     const now = Date.now();
-    if (now - lastCheck < 150) return;
-    lastCheck = now;
+    if (now - lastCheckTime < 200) return;
+    lastCheckTime = now;
 
-    // Sample every 4th pixel for performance
-    const data  = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let transparent = 0;
-    const stride = 16; // check every 4th pixel (4 channels × 4)
+    // Sample every 4th pixel (stride of 16 bytes) — fast enough
+    const data   = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let   erased = 0;
+    const stride = 16;
     const total  = Math.floor(data.length / stride);
     for (let i = 3; i < data.length; i += stride) {
-      if (data[i] < 128) transparent++;
+      if (data[i] < 128) erased++;
     }
 
-    const pct = (transparent / total) * 100;
-    progressBar.style.width = Math.min(pct, 100) + '%';
-
-    if (pct > 40 && !revealed) {
-      revealed = true;
-      requestAnimationFrame(() => {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        progressBar.style.width = '100%';
-        hint.style.opacity = '0';
-        badge.classList.add('show');
-      });
-    }
+    const pct = Math.min((erased / total) * 100, 100);
+    progressBar.style.width = pct + '%';
+    // No auto-reveal — user scratches as much or as little as they want
   }
 
   /* ── Event handlers ── */
   function onStart(e) {
     e.preventDefault();
-    if (revealed) return;
     isDrawing = true;
-    lastX = null; lastY = null;
+    lastX = null;
+    lastY = null;
     const p = getPos(e);
     scratchAt(p.x, p.y);
   }
 
   function onMove(e) {
     e.preventDefault();
-    if (!isDrawing || revealed) return;
+    if (!isDrawing) return;
     const p = getPos(e);
     scratchAt(p.x, p.y);
-    checkProgress();
+    updateProgress();
   }
 
-  function onEnd() {
+  function onEnd(e) {
+    if (e) e.preventDefault();
     isDrawing = false;
-    lastX = null; lastY = null;
+    lastX = null;
+    lastY = null;
   }
 
-  canvas.addEventListener('mousedown',   onStart, { passive: false });
-  canvas.addEventListener('mousemove',   onMove,  { passive: false });
-  canvas.addEventListener('mouseup',     onEnd);
-  canvas.addEventListener('mouseleave',  onEnd);
+  // Mouse
+  canvas.addEventListener('mousedown',  onStart, { passive: false });
+  canvas.addEventListener('mousemove',  onMove,  { passive: false });
+  canvas.addEventListener('mouseup',    onEnd,   { passive: false });
+  canvas.addEventListener('mouseleave', onEnd,   { passive: false });
 
+  // Touch
   canvas.addEventListener('touchstart',  onStart, { passive: false });
   canvas.addEventListener('touchmove',   onMove,  { passive: false });
   canvas.addEventListener('touchend',    onEnd,   { passive: false });
   canvas.addEventListener('touchcancel', onEnd,   { passive: false });
 
+  // Reset button — only way to restore the red layer
   resetBtn.addEventListener('click', initCanvas);
 
+  // Recalculate on orientation change / resize
   window.addEventListener('resize', initCanvas);
 
   /* ── Boot ── */
   function boot() {
-    // Wait for fonts to be ready so text renders right
     document.fonts.ready.then(initCanvas).catch(initCanvas);
   }
 
